@@ -156,6 +156,8 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
+const jwt=require("jsonwebtoken");
+const bcrypt=require("bcrypt");
 
 // Initialize Express app
 const app = express();
@@ -194,6 +196,13 @@ const movieSchema = new mongoose.Schema({
 
 const movieModel = mongoose.model("movies", movieSchema);
 
+const userSchema=new mongoose.Schema({
+  username:{type:String,required:true,unique:true},
+  password:{type:String,required:true},
+});
+
+const user=mongoose.model("users",userSchema);
+
 // Routes
 
 // GET: Fetch all movies
@@ -224,6 +233,51 @@ app.get("/api/movies/:id", async (req, res) => {
     res.status(500).json({ message: "Error fetching movie", error: error.message });
   }
 });
+
+app.post("/api/register", async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = new user({ username, password: hashedPassword });
+    const savedUser = await newUser.save();
+    res.status(200).json({ message: "User registered successfully", user: savedUser });
+  } catch (error) {
+    res.status(500).json({ message: "Error registering user", error: error.message });
+  }
+});
+
+app.post("/api/login",async(req,res)=>{
+  const{username,password}=req.body;
+  const userData=await user.findOne({username});
+
+  const isPasswordValid=bcrypt.compare(password,userData.password);
+  if(!isPasswordValid){
+    return res.status(401).json({message:"Invalid credentials"});
+  }
+  const token=jwt.sign({username:userData.username},"my-key",{expiresIn:"1h"});
+  res.status(200).jsonp({message:"Login successful",token});
+});
+
+
+const authorize=(req,res,next)=>{
+  const token=req.headers['authorization'].split(" ")[1];
+  console.log(token)
+  if(!token){
+    return res.status(403).json({message:"No token provided"});
+  }
+  jwt.verify(token,"my-key",(err,userInfo)=>{
+    if(err){
+      return res.status(401).json({message:"Unauthorized"});
+    }
+    req.user=userInfo;
+    next();
+  });
+
+};
+app.get("/api/secured",authorize,(req,res)=>{
+  res.json({message:"Access granted",user:req.user});
+});
+
 
 // POST: Create a new movie
 app.post("/api/movies", async (req, res) => {
