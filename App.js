@@ -161,7 +161,7 @@ const bcrypt=require("bcrypt");
 
 // Initialize Express app
 const app = express();
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 3000;
 
 // Middleware to parse JSON request bodies
 app.use(express.json());
@@ -261,6 +261,7 @@ app.post("/api/login",async(req,res)=>{
 
 const authorize=(req,res,next)=>{
   const token=req.headers['authorization'].split(" ")[1];
+  
   console.log(token)
   if(!token){
     return res.status(403).json({message:"No token provided"});
